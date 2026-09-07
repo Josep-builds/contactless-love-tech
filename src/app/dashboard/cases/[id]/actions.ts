@@ -29,6 +29,42 @@ export async function claimCase(caseId: string) {
   return { error: null };
 }
 
+export async function closeCase(caseId: string, confirmed: boolean) {
+  const parsedId = z.string().uuid().safeParse(caseId);
+  if (!parsedId.success) {
+    return { error: "Invalid case id." };
+  }
+
+  // Shadow Clause, UI layer: this control must be inert until a human
+  // has ticked the confirmation checkbox. The DB constraint + trigger
+  // in supabase/migrations/00001_init.sql are what actually make this
+  // unbypassable — this check just keeps the failure close to the user.
+  if (!confirmed) {
+    return { error: "Confirm the patient reached treatment before closing." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated." };
+
+  const { error } = await supabase
+    .from("cases")
+    .update({
+      status: "closed",
+      confirmed_by: user.id,
+      confirmed_at: new Date().toISOString(),
+    })
+    .eq("id", caseId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/dashboard/cases/${caseId}`);
+  revalidatePath("/dashboard");
+  return { error: null };
+}
+
 export async function addFollowUpNote(formData: FormData) {
   const parsed = followUpNoteSchema.safeParse({
     case_id: formData.get("case_id"),

@@ -6,6 +6,7 @@ import { elapsedLabel, STATUS_LABEL } from "@/lib/format";
 import { SimulatedBadge } from "@/components/SimulatedBadge";
 import { ClaimCaseButton } from "@/components/ClaimCaseButton";
 import { FollowUpNoteForm } from "@/components/FollowUpNoteForm";
+import { CloseCaseForm } from "@/components/CloseCaseForm";
 
 export default async function CaseDetailPage({
   params,
@@ -90,7 +91,17 @@ export default async function CaseDetailPage({
       <section className="mt-6">
         {isUnassigned && <ClaimCaseButton caseId={caseRow.id} />}
         {isMine && caseRow.status !== "closed" && (
-          <FollowUpNoteForm caseId={caseRow.id} />
+          <>
+            <FollowUpNoteForm caseId={caseRow.id} />
+            <CloseCaseForm
+              caseId={caseRow.id}
+              operatorName={
+                (user!.user_metadata?.full_name as string | undefined) ??
+                user!.email ??
+                "You"
+              }
+            />
+          </>
         )}
       </section>
     </div>
