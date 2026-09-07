@@ -20,6 +20,25 @@ session) are complete and committed:
    `josepbuilds/contactless-love-tech` →
    https://contactless-love-tech.vercel.app.
 
+## Verified live (2026-09-07)
+
+Ran `supabase/tests/shadow_clause.sql`'s four scenarios against the actual
+hosted database (`olgtvkzmtkwxamwhdpjl`), not just reasoned through them —
+via `supabase db query --linked`, using a throwaway operator pair + case
+created for the run and deleted immediately after (verified zero rows left
+behind). All 4 passed:
+
+1. Authenticated operator, no `confirmed_by`/`confirmed_at` → rejected.
+2. `service_role` (no auth session), both fields forged → rejected —
+   confirms no automated process can close a case, period.
+3. Authenticated operator, `confirmed_by` set to a *different* operator
+   (impersonation) → rejected.
+4. Authenticated operator, `confirmed_by = self` → succeeded, row shows
+   `status = closed` with both fields correctly populated.
+
+The RLS isolation test (`supabase/tests/rls_isolation.sql`) is still only
+reasoned through, not executed live — see Known gaps below.
+
 ## Decisions and why
 
 - **CHECK constraint + trigger, not just a trigger, for the Shadow
@@ -66,10 +85,10 @@ session) are complete and committed:
 
 - `supabase/seed.sql` only works against a local `supabase start` stack
   (it inserts directly into `auth.users`, which you shouldn't do on a
-  hosted project). The hosted project currently has no seed data — the
-  two-operator RLS isolation test in `supabase/tests/rls_isolation.sql`
-  has been reasoned through carefully but not executed against a live
-  database; run it locally or adapt it with real signed-in operators'
+  hosted project). The two-operator RLS isolation test in
+  `supabase/tests/rls_isolation.sql` has been reasoned through carefully
+  but not executed against a live database (unlike the Shadow Clause
+  tests above); run it locally or adapt it with real signed-in operators'
   UUIDs to actually exercise it.
 - `src/middleware.ts` uses Next.js's deprecated middleware convention
   (`next build` warns and suggests migrating to `proxy.ts`). Left as-is
