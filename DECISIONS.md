@@ -36,8 +36,25 @@ behind). All 4 passed:
 4. Authenticated operator, `confirmed_by = self` → succeeded, row shows
    `status = closed` with both fields correctly populated.
 
-The RLS isolation test (`supabase/tests/rls_isolation.sql`) is still only
-reasoned through, not executed live — see Known gaps below.
+The RLS isolation test (`supabase/tests/rls_isolation.sql`) has also now
+been run live, same method — throwaway Operator A/B pair, one case each
+plus one unassigned, deleted immediately after (verified zero rows left
+behind). All 3 checks passed:
+
+1. As Operator A: `SELECT * FROM cases` returned exactly A's case + the
+   unassigned one — B's case never appeared.
+2. As Operator B: same query returned exactly B's case + the unassigned
+   one — A's case never appeared.
+3. As Operator B, `UPDATE cases SET last_contacted_at = now() WHERE
+   patient_label = '...A1'` (Operator A's case) ran without error but
+   affected 0 rows — confirmed via a service-role read that
+   `last_contacted_at` was still `null` afterward. RLS silently excludes
+   the row from the update's target set rather than raising an error,
+   exactly as documented in the test script's comments.
+
+Both DB-level guarantees in this project — Shadow Clause and RLS
+isolation — are now verified against the live hosted database, not just
+reasoned through.
 
 ## Decisions and why
 
@@ -85,19 +102,16 @@ reasoned through, not executed live — see Known gaps below.
 
 - `supabase/seed.sql` only works against a local `supabase start` stack
   (it inserts directly into `auth.users`, which you shouldn't do on a
-  hosted project). The two-operator RLS isolation test in
-  `supabase/tests/rls_isolation.sql` has been reasoned through carefully
-  but not executed against a live database (unlike the Shadow Clause
-  tests above); run it locally or adapt it with real signed-in operators'
-  UUIDs to actually exercise it.
+  hosted project) — it's for local dev convenience only. Live RLS
+  isolation is now separately verified, see above.
 - `src/middleware.ts` uses Next.js's deprecated middleware convention
   (`next build` warns and suggests migrating to `proxy.ts`). Left as-is
   since the codemod requires a clean git tree mid-build-out and the
   rename isn't functionally necessary yet.
-- No automated test exercises the Shadow Clause trigger or RLS policies
-  in CI — they're SQL scripts meant to be run manually or via `supabase
-  db query --linked -f <file>`. A fast-follow would wire these into a
-  GitHub Action against a preview Supabase branch.
+- Both DB-level guarantees have now been run live (see above), but not in
+  CI — they're SQL scripts meant to be run manually or via `supabase db
+  query --linked -f <file>`. A fast-follow would wire these into a GitHub
+  Action against a preview Supabase branch.
 - The personal access tokens used to set this up (Supabase, Vercel) were
   pasted into the chat session to authenticate the CLIs non-interactively.
   Recommend revoking and regenerating both once you've confirmed the
