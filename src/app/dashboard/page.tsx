@@ -1,6 +1,18 @@
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { QueueList } from "@/components/QueueList";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: cases } = await supabase
+    .from("cases")
+    .select("*")
+    .neq("status", "closed");
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -12,10 +24,12 @@ export default function DashboardPage() {
           Simulate detection event
         </Link>
       </div>
-      <p className="mt-2 text-sm text-slate-400">
-        No cases yet. Simulated detection events will appear here, ranked by
-        priority.
+      <p className="mt-1 text-sm text-slate-500">
+        Ranked by priority score (severity + time since detection), not by
+        creation order.
       </p>
+
+      <QueueList cases={cases ?? []} currentOperatorId={user!.id} />
     </div>
   );
 }
